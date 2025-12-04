@@ -72,8 +72,12 @@ if prompt := st.chat_input("What is your task?"):
         message_placeholder = st.empty()
         try:
             response = requests.post(
-                "http://localhost:8000/chat",
-                json={"message": prompt}
+                "http://localhost:8000/api/v1/chat",
+                json={
+                    "message": prompt,
+                    "session_id": st.session_state.session_id,
+                    "user_id": "default_user"  # In a real app, this would come from auth
+                }
             )
             if response.status_code == 200:
                 full_response = response.json()["response"]

@@ -2,6 +2,8 @@ from langgraph.graph import StateGraph, END
 from app.agents.state import AgentState
 from app.agents.base import BaseAgent
 from app.agents.router import RouterAgent
+from app.agents.researcher import get_researcher_agent
+from app.agents.coder import get_coder_agent
 from langchain_openai import ChatOpenAI
 
 # Initialize Model
@@ -10,17 +12,8 @@ llm = ChatOpenAI(model="gpt-4o")
 # Initialize Agents
 router_agent = RouterAgent(model=llm)
 
-researcher_agent = BaseAgent(
-    name="researcher",
-    model=llm,
-    system_prompt="You are a researcher. You search for information and provide detailed answers."
-)
-
-coder_agent = BaseAgent(
-    name="coder",
-    model=llm,
-    system_prompt="You are a coder. You write clean, efficient, and well-documented Python code."
-)
+researcher_agent = get_researcher_agent(model=llm)
+coder_agent = get_coder_agent(model=llm)
 
 general_agent = BaseAgent(
     name="general_assistant",

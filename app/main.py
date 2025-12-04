@@ -1,29 +1,17 @@
 from fastapi import FastAPI, HTTPException
-from pydantic import BaseModel
 from app.core.config import settings
-from app.agents.graph import graph
-from langchain_core.messages import HumanMessage
+from app.api.v1.api import api_router
 
 app = FastAPI(
     title=settings.PROJECT_NAME,
     openapi_url=f"{settings.API_V1_STR}/openapi.json"
 )
 
-class ChatRequest(BaseModel):
-    message: str
+app.include_router(api_router, prefix=settings.API_V1_STR)
 
 @app.get("/")
 async def root():
     return {"message": "Welcome to Agentic Chat API"}
-
-@app.post("/chat")
-async def chat(request: ChatRequest):
-    try:
-        inputs = {"messages": [HumanMessage(content=request.message)]}
-        result = graph.invoke(inputs)
-        return {"response": result['messages'][-1].content}
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
 
 if __name__ == "__main__":
     import uvicorn
