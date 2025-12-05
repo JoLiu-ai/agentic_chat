@@ -1,0 +1,267 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Agentic Chat - 智能对话助手</title>
+    <meta name="description" content="基于多Agent架构的智能对话系统">
+    <link rel="stylesheet" href="/static/css/main.css">
+    <link rel="stylesheet"
+        href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/atom-one-light.min.css">
+</head>
+
+<body>
+    <!-- Header -->
+    <header class="header">
+        <div class="header-left">
+            <button class="menu-toggle" id="menuToggle" aria-label="Toggle menu">
+                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor">
+                    <path d="M3 12h18M3 6h18M3 18h18" stroke-width="2" stroke-linecap="round" />
+                </svg>
+            </button>
+            <h1 class="logo">
+                <span class="logo-icon">🤖</span>
+                <span class="logo-text">Agentic Chat</span>
+            </h1>
+        </div>
+        <div class="header-right">
+            <button class="icon-button" id="themeToggle" aria-label="Toggle theme">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor">
+                    <circle cx="12" cy="12" r="5" />
+                    <path
+                        d="M12 1v2M12 21v2M4.22 4.22l1.42 1.42M18.36 18.36l1.42 1.42M1 12h2M21 12h2M4.22 19.78l1.42-1.42M18.36 5.64l1.42-1.42" />
+                </svg>
+            </button>
+            <button class="icon-button" id="settingsButton" aria-label="Settings">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor">
+                    <circle cx="12" cy="12" r="3" />
+                    <path d="M12 1v6m0 6v10" />
+                </svg>
+            </button>
+        </div>
+    </header>
+
+    <!-- Main Container -->
+    <div class="container">
+        <!-- Sidebar -->
+        <aside class="sidebar" id="sidebar">
+            <!-- Compact Header -->
+            <div class="sidebar-header-compact">
+                <button class="new-chat-button-compact" id="newChatButton">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor">
+                        <path d="M12 5v14M5 12h14" stroke-width="2" stroke-linecap="round" />
+                    </svg>
+                    新建
+                </button>
+                <div class="search-input-wrapper">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                        class="search-icon">
+                        <circle cx="11" cy="11" r="8" />
+                        <path d="m21 21-4.35-4.35" />
+                    </svg>
+                    <input type="text" placeholder="搜索..." id="sessionSearch" class="search-input-compact">
+                </div>
+            </div>
+
+            <!-- Session List with Time Groups -->
+            <div class="sidebar-content-new">
+                <!-- Starred Sessions (if any) -->
+                <div class="time-group" id="starredGroup" style="display: none;">
+                    <div class="time-group-header">⭐ 收藏</div>
+                    <div class="session-items" id="starredList"></div>
+                </div>
+
+                <!-- Today -->
+                <div class="time-group" id="todayGroup" style="display: none;">
+                    <div class="time-group-header">今天</div>
+                    <div class="session-items" id="todayList"></div>
+                </div>
+
+                <!-- Yesterday -->
+                <div class="time-group" id="yesterdayGroup" style="display: none;">
+                    <div class="time-group-header">昨天</div>
+                    <div class="session-items" id="yesterdayList"></div>
+                </div>
+
+                <!-- Last 7 Days -->
+                <div class="time-group" id="lastWeekGroup" style="display: none;">
+                    <div class="time-group-header">最近7天</div>
+                    <div class="session-items" id="lastWeekList"></div>
+                </div>
+
+                <!-- Earlier -->
+                <div class="time-group" id="earlierGroup" style="display: none;">
+                    <div class="time-group-header">更早</div>
+                    <div class="session-items" id="earlierList"></div>
+                </div>
+
+                <!-- Empty State -->
+                <div class="sidebar-empty" id="sidebarEmpty">
+                    <p>暂无对话</p>
+                    <p class="sidebar-empty-hint">点击"新建"开始对话</p>
+                </div>
+            </div>
+
+            <!-- Bottom Toolbar -->
+            <div class="sidebar-footer-new">
+                <a href="/router-monitor" class="footer-link" target="_blank" title="Router监控">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor">
+                        <path d="M18 20V10M12 20V4M6 20v-6" />
+                    </svg>
+                </a>
+                <button class="footer-link" id="settingsButtonSidebar" title="设置">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor">
+                        <circle cx="12" cy="12" r="3" />
+                        <path d="M12 1v6m0 6v10" />
+                    </svg>
+                </button>
+            </div>
+        </aside>
+
+        <!-- Main Chat Area -->
+        <main class="main-content">
+            <!-- Welcome Screen -->
+            <div class="welcome-screen" id="welcomeScreen">
+                <div class="welcome-content">
+                    <div class="welcome-icon">🤖</div>
+                    <h2>欢迎使用 Agentic Chat</h2>
+                    <p>我是一个多Agent智能助手，可以帮你：</p>
+
+                    <div class="feature-grid">
+                        <div class="feature-card">
+                            <div class="feature-icon">🔍</div>
+                            <h3>网络搜索</h3>
+                            <p>实时获取最新信息</p>
+                        </div>
+                        <div class="feature-card">
+                            <div class="feature-icon">💻</div>
+                            <h3>代码执行</h3>
+                            <p>编写和运行Python代码</p>
+                        </div>
+                        <div class="feature-card">
+                            <div class="feature-icon">💬</div>
+                            <h3>智能对话</h3>
+                            <p>日常交流和问答</p>
+                        </div>
+                    </div>
+
+                    <div class="example-prompts">
+                        <p class="example-label">试试这些问题：</p>
+                        <button class="example-prompt">今天北京天气如何？</button>
+                        <button class="example-prompt">写一个快速排序算法</button>
+                        <button class="example-prompt">解释一下量子计算</button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Chat Messages -->
+            <div class="chat-messages" id="chatMessages" style="display: none;">
+                <!-- Messages will be appended here -->
+            </div>
+
+            <!-- Input Area -->
+            <div class="input-container">
+                <!-- Thinking Indicator -->
+                <div class="thinking-indicator" id="thinkingIndicator" style="display: none;">
+                    <div class="thinking-icon">🤖</div>
+                    <div class="thinking-text">
+                        <span id="thinkingAgent">Assistant</span> is thinking
+                        <span class="thinking-dots">
+                            <span>.</span><span>.</span><span>.</span>
+                        </span>
+                    </div>
+                </div>
+
+                <div class="input-wrapper">
+                    <div class="input-controls-left">
+                        <button class="input-icon-button" id="attachButton" title="附加文件">
+                            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor">
+                                <path d="M12 5v14M5 12h14" stroke-width="2" stroke-linecap="round" />
+                            </svg>
+                        </button>
+                        <button class="input-icon-button" id="formatButton" title="格式">
+                            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor">
+                                <path d="M4 7h16M10 11h10M4 15h16" stroke-width="2" stroke-linecap="round" />
+                            </svg>
+                        </button>
+                    </div>
+
+                    <textarea id="messageInput" class="message-input" placeholder="How can I help you today?"
+                        rows="1"></textarea>
+
+                    <div class="input-controls-right">
+                        <!-- Think Mode Toggle -->
+                        <button class="mode-toggle" id="modeToggle" title="切换模式">
+                            <span class="mode-icon" id="modeIcon">💡</span>
+                            <span class="mode-text" id="modeText">Think</span>
+                        </button>
+
+                        <select id="modelSelect" class="model-select-compact">
+                            <option value="gpt-4o">GPT-4o</option>
+                            <option value="gpt-4-turbo">GPT-4 Turbo</option>
+                            <option value="gpt-3.5-turbo">GPT-3.5</option>
+                        </select>
+                        <button class="send-button" id="sendButton" disabled>
+                            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor">
+                                <path d="M12 19V5M5 12l7-7 7 7" stroke-width="2" stroke-linecap="round"
+                                    stroke-linejoin="round" />
+                            </svg>
+                        </button>
+                    </div>
+                </div>
+
+                <div class="input-hint">
+                    <span class="hint-item">
+                        <kbd>⇧</kbd> + <kbd>↵</kbd> 换行
+                    </span>
+                    <span class="hint-separator">·</span>
+                    <span class="hint-item">
+                        <kbd>↵</kbd> 发送
+                    </span>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <!-- Context Menu -->
+    <div class="context-menu" id="contextMenu">
+        <div class="context-menu-item" data-action="star">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor">
+                <path
+                    d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z" />
+            </svg>
+            <span>Star</span>
+        </div>
+        <div class="context-menu-item" data-action="rename">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor">
+                <path d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7" />
+                <path d="M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z" />
+            </svg>
+            <span>Rename</span>
+        </div>
+        <div class="context-menu-item" data-action="add-to-project">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor">
+                <path d="M22 19a2 2 0 01-2 2H4a2 2 0 01-2-2V5a2 2 0 012-2h5l2 3h9a2 2 0 012 2z" />
+            </svg>
+            <span>Add to project</span>
+        </div>
+        <div class="context-menu-divider"></div>
+        <div class="context-menu-item context-menu-item-danger" data-action="delete">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor">
+                <path d="M3 6h18M19 6v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6m3 0V4a2 2 0 012-2h4a2 2 0 012 2v2" />
+            </svg>
+            <span>Delete</span>
+        </div>
+    </div>
+
+    <!-- Scripts -->
+    <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/dompurify@3.0.6/dist/purify.min.js"></script>
+    <script src="/static/js/api.js"></script>
+    <script src="/static/js/markdown.js"></script>
+    <script src="/static/js/app.js"></script>
+</body>
+
+</html>

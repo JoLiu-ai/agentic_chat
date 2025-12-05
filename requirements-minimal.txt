@@ -1,0 +1,21 @@
+# Minimal dependencies for Agentic Chat
+# Install with: pip install -r requirements-minimal.txt
+
+fastapi==0.109.0
+uvicorn[standard]==0.27.0
+pydantic==2.5.3
+pydantic-settings==2.1.0
+python-dotenv==1.0.0
+
+# LangChain - use latest compatible versions
+langchain>=0.1.0
+langchain-openai>=0.0.1
+langgraph>=0.0.1
+langchain-experimental>=0.0.1
+
+# Tools
+tavily-python>=0.3.0
+
+# Utilities
+httpx
+tenacity
