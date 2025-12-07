@@ -1,0 +1,58 @@
+# Cursor AI 规则 - Agentic Chat 项目
+
+## 📁 项目结构规则（必须遵守）
+
+### 1. 虚拟环境位置
+- ✅ Python 虚拟环境必须在 `backend/.venv/`
+- ❌ 根目录不应该有 `venv/` 或 `.venv/`
+- 如果发现根目录有 `venv/`，应该删除或移动到 `backend/`
+
+### 2. .gitignore 分层设计
+- **根目录 `.gitignore`**：只包含项目级别的规则（.temp/, logs/, .env 等）
+- **`backend/.gitignore`**：包含 Python 特定规则（.venv/, __pycache__/, *.pyc 等）
+- **`frontend/.gitignore`**：包含 Node.js 特定规则（node_modules/, dist/, .vite/ 等）
+- 不要混合前后端的忽略规则
+
+### 3. 临时文件管理
+- 所有临时文件、调试文档、草稿放在 `.temp/` 目录
+- `.temp/` 已被 `.gitignore` 和 `.cursorignore` 忽略
+- 可以随时删除 `.temp/` 中的内容
+
+### 4. 目录边界
+- 后端所有文件在 `backend/` 内
+- 前端所有文件在 `frontend/` 内
+- 根目录只保留项目级别的配置和文档
+
+### 5. 依赖管理
+- 后端依赖：`backend/requirements.txt`
+- 前端依赖：`frontend/package.json`
+- 根目录不应该有 `package.json`（除非是 monorepo）
+
+## 🚫 不应该存在的结构
+
+根目录不应该有：
+- `node_modules/` - 应该在 `frontend/`
+- `venv/` 或 `.venv/` - 应该在 `backend/`
+- `app/` - 应该在 `backend/app/`
+- `data/` - 应该在 `backend/data/`
+- `package.json` - 应该在 `frontend/`
+
+## 📝 操作规范
+
+1. **创建新文件时**：检查应该放在哪个目录（backend/ 还是 frontend/）
+2. **修改 .gitignore 时**：检查应该修改哪个文件（根目录、backend/ 还是 frontend/）
+3. **发现根目录有 venv/ 时**：提醒用户删除或移动到 backend/
+4. **临时文件**：自动放到 `.temp/` 目录
+
+## 🔍 检查清单
+
+在修改项目结构前，检查：
+- [ ] 虚拟环境在 `backend/.venv/` 吗？
+- [ ] `.gitignore` 规则在正确的文件中吗？
+- [ ] 临时文件在 `.temp/` 吗？
+- [ ] 根目录没有不应该存在的文件吗？
+
+---
+
+**记住这些规则，保持项目结构清晰！** ✨
+
