@@ -194,6 +194,7 @@ body {
   z-index: 10;
   pointer-events: auto;
   user-select: none;
+  text-decoration: none;
 }
 
 .new-chat-button-compact:hover {
@@ -282,6 +283,8 @@ body {
   transition: all var(--transition-fast);
   position: relative;
   gap: var(--spacing-sm);
+  text-decoration: none;
+  color: inherit;
 }
 
 .session-item-new:hover {
@@ -1725,6 +1728,36 @@ code {
   min-width: 28px;
   text-align: center;
   color: var(--text-tertiary);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+}
+
+.generating-indicator {
+  display: inline-flex;
+  align-items: center;
+  margin-left: 4px;
+}
+
+.generating-dot {
+  display: inline-block;
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background-color: var(--accent-primary);
+  animation: pulse-dot 1.5s ease-in-out infinite;
+}
+
+@keyframes pulse-dot {
+  0%, 100% {
+    opacity: 1;
+    transform: scale(1);
+  }
+  50% {
+    opacity: 0.5;
+    transform: scale(0.8);
+  }
 }
 
 .nav-btn {

@@ -157,12 +157,54 @@ export const healthAPI = {
 
 // ===== 导出所有 API =====
 
+// ===== Router监控 API =====
+
+export const routerAPI = {
+  /**
+   * 获取路由统计信息
+   */
+  getStats: (): Promise<{
+    total_routes: number;
+    researcher_count: number;
+    coder_count: number;
+    general_count: number;
+    researcher_percentage: number;
+    coder_percentage: number;
+    general_percentage: number;
+  }> => apiClient.get('/router/routes/stats'),
+
+  /**
+   * 获取路由历史记录
+   */
+  getHistory: (limit: number = 50): Promise<Array<{
+    id: number;
+    session_id: string;
+    user_message: string;
+    routed_to: string;
+    reasoning: string;
+    timestamp: string;
+  }>> => apiClient.get('/router/routes/history', { params: { limit } }),
+
+  /**
+   * 获取特定会话的路由历史
+   */
+  getSessionRoutes: (sessionId: string): Promise<Array<{
+    id: number;
+    session_id: string;
+    user_message: string;
+    routed_to: string;
+    reasoning: string;
+    timestamp: string;
+  }>> => apiClient.get(`/router/routes/session/${sessionId}`),
+};
+
 export const api = {
   session: sessionAPI,
   message: messageAPI,
   config: configAPI,
   project: projectAPI,
   health: healthAPI,
+  router: routerAPI,
 };
 
 export default api;

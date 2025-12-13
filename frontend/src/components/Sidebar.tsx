@@ -2,6 +2,7 @@
  * Sidebar 组件 - 会话列表
  */
 import React, { useEffect, useState } from 'react';
+import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { useAppStore } from '../store';
 import { api } from '../api/endpoints';
 import { groupSessionsByTime } from '../utils/helpers';
@@ -16,22 +17,43 @@ interface SessionItemProps {
 }
 
 const SessionItem: React.FC<SessionItemProps> = ({ session, isActive, icon, onClick, onMore }) => {
+  const sessionId = session.session_id || session.id;
+  
+  const handleLinkClick = (e: React.MouseEvent<HTMLAnchorElement>) => {
+    // 如果点击的是更多按钮，阻止导航
+    if ((e.target as HTMLElement).closest('.session-more-btn')) {
+      e.preventDefault();
+      e.stopPropagation();
+      return;
+    }
+    // Link 会自动处理导航，onClick 只用于额外的处理（如果有）
+    // 不阻止默认行为，让 Link 正常导航
+    if (onClick) {
+      onClick();
+    }
+  };
+  
   return (
-    <div
+    <Link
+      to={`/chat/${sessionId}`}
       className={`session-item-new ${isActive ? 'active' : ''}`}
-      data-session-id={session.session_id || session.id}
-      onClick={onClick}
+      data-session-id={sessionId}
+      onClick={handleLinkClick}
     >
       <span className="session-icon">{icon}</span>
       <span className="session-title-new">{session.title || '未命名对话'}</span>
       <button 
         className="session-more-btn" 
         title="更多操作"
-        onClick={onMore}
+        onClick={(e) => {
+          e.preventDefault();
+          e.stopPropagation();
+          onMore(e);
+        }}
       >
         ⋯
       </button>
-    </div>
+    </Link>
   );
 };
 
@@ -40,10 +62,17 @@ export const Sidebar: React.FC<{
   onNewChat: () => void;
   onSessionAction: (sessionId: string, action: string) => void;
 }> = ({ onSessionClick, onNewChat, onSessionAction }) => {
-  const { sessions, currentSessionId, sidebarOpen, setSessions } = useAppStore();
+  const { sessions, sidebarOpen, setSessions } = useAppStore();
+  const location = useLocation();
+  const navigate = useNavigate();
   const [searchQuery, setSearchQuery] = useState('');
   const [contextMenuSession, setContextMenuSession] = useState<string | null>(null);
   const [contextMenuPos, setContextMenuPos] = useState({ x: 0, y: 0 });
+  
+  // 从路由路径中提取当前会话ID
+  const currentSessionId = location.pathname.startsWith('/chat/') 
+    ? location.pathname.replace('/chat/', '') 
+    : null;
   
   useEffect(() => {
     loadSessions();
@@ -114,20 +143,19 @@ export const Sidebar: React.FC<{
       <aside className={`sidebar ${sidebarOpen ? 'open' : ''}`} id="sidebar">
         {/* Header */}
         <div className="sidebar-header-compact">
-          <button 
+          <Link
+            to="/"
             className="new-chat-button-compact" 
             onClick={(e) => {
-              e.preventDefault();
               e.stopPropagation();
               onNewChat();
             }}
-            type="button"
           >
             <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor">
               <path d="M12 5v14M5 12h14" strokeWidth="2" strokeLinecap="round" />
             </svg>
             新建
-          </button>
+          </Link>
           <div className="search-input-wrapper">
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" className="search-icon">
               <circle cx="11" cy="11" r="8" />
@@ -163,11 +191,11 @@ export const Sidebar: React.FC<{
         
         {/* Footer */}
         <div className="sidebar-footer-new">
-          <a href="/router-monitor" className="footer-link" target="_blank" title="Router监控">
+          <Link to="/router-monitor" className="footer-link" title="Router监控">
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor">
               <path d="M18 20V10M12 20V4M6 20v-6" />
             </svg>
-          </a>
+          </Link>
           <button className="footer-link" title="设置">
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor">
               <circle cx="12" cy="12" r="3" />

@@ -3,6 +3,7 @@
  * 完整迁移所有原功能
  */
 import React, { useEffect, useState, useRef, useMemo } from 'react';
+import { useParams, useNavigate, Routes, Route } from 'react-router-dom';
 import { useAppStore } from './store';
 import { api } from './api/endpoints';
 import { Header } from './components/Header';
@@ -10,11 +11,16 @@ import { Sidebar } from './components/Sidebar';
 import { WelcomeScreen } from './components/WelcomeScreen';
 import { Message } from './components/Message';
 import { ChatInput } from './components/ChatInput';
+import { RouterMonitor } from './components/RouterMonitor';
 import { logger } from './utils/logger';
 import type { Model } from './types';
 import './styles/main.css';
 
-const App: React.FC = () => {
+// 聊天页面组件
+const ChatPage: React.FC = () => {
+  const { sessionId } = useParams<{ sessionId?: string }>();
+  const navigate = useNavigate();
+  
   const {
     sessions,
     setSessions,
@@ -25,9 +31,11 @@ const App: React.FC = () => {
     addMessage,
     clearMessages,
     setLoading,
+    isLoading,
     currentModel,
     sidebarOpen,
     theme,
+    setUserMessageVersionIndex,
   } = useAppStore();
   
   const [models, setModels] = useState<Model[]>([]);
@@ -39,6 +47,19 @@ const App: React.FC = () => {
     initApp();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []); // 空依赖数组，确保只执行一次
+  
+  // 从路由参数加载会话
+  useEffect(() => {
+    if (sessionId) {
+      loadSessionFromRoute(sessionId);
+    } else {
+      // 没有 sessionId 时显示欢迎页面
+      setCurrentSessionId(null);
+      clearMessages();
+      setShowWelcome(true);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [sessionId]);
   
   // 自动滚动到底部
   useEffect(() => {
@@ -53,6 +74,26 @@ const App: React.FC = () => {
       setShowWelcome(false);
     }
   }, [currentSessionId, messages.length]); // 只依赖长度，避免不必要的更新
+  
+  const loadSessionFromRoute = async (id: string) => {
+    try {
+      setCurrentSessionId(id);
+      setShowWelcome(false);
+      clearMessages();
+      
+      // 加载消息
+      const data = await api.session.getMessages(id);
+      setMessages(data.messages || []);
+      
+      // 刷新会话列表
+      await loadSessions();
+    } catch (error) {
+      console.error('加载会话失败:', error);
+      alert('加载对话失败，请重试');
+      // 加载失败时跳转到首页
+      navigate('/');
+    }
+  };
   
   const initApp = async () => {
     logger.info('应用初始化开始');
@@ -83,9 +124,7 @@ const App: React.FC = () => {
   
   const handleNewChat = () => {
     logger.info('新建对话');
-    setCurrentSessionId(null);
-    clearMessages();
-    setShowWelcome(true);
+    navigate('/');
     // 确保输入框获得焦点
     setTimeout(() => {
       const input = document.querySelector('.message-input') as HTMLTextAreaElement;
@@ -95,22 +134,9 @@ const App: React.FC = () => {
     }, 100);
   };
   
-  const handleSessionClick = async (sessionId: string) => {
-    try {
-      setCurrentSessionId(sessionId);
-      setShowWelcome(false);
-      clearMessages();
-      
-      // 加载消息
-      const data = await api.session.getMessages(sessionId);
-      setMessages(data.messages || []);
-      
-      // 刷新会话列表
-      await loadSessions();
-    } catch (error) {
-      console.error('加载会话失败:', error);
-      alert('加载对话失败，请重试');
-    }
+  const handleSessionClick = (sessionId: string) => {
+    // Link 组件已经处理了导航，这里可以做一些额外的处理（如日志记录）
+    logger.debug('会话点击', { sessionId });
   };
   
   const handleSessionAction = async (sessionId: string, action: string) => {
@@ -171,7 +197,35 @@ const App: React.FC = () => {
         sessionId = newSession.session_id || newSession.id;
         setCurrentSessionId(sessionId);
         setShowWelcome(false);
+        // 跳转到新会话的路由
+        navigate(`/chat/${sessionId}`);
         logger.info('新会话创建成功', { sessionId });
+      }
+      
+      // 检查是否是重试（相同内容的用户消息）
+      const existingUserMsg = messages
+        .filter(m => m.role === 'user' && !m.parent_id)
+        .reverse()
+        .find(m => m.content === messageText);
+      const isRetry = !!existingUserMsg;
+      
+      // 如果是重试，立即切换到"即将生成"的版本（显示正确的版本号）
+      if (isRetry && existingUserMsg) {
+        // 计算当前已有的版本数
+        const userMsgId = existingUserMsg.message_id || parseInt(existingUserMsg.id);
+        const currentChildren = messages.filter(m => {
+          if (m.role !== 'assistant' || !m.parent_id) return false;
+          const parentId = typeof m.parent_id === 'number' ? m.parent_id : parseInt(String(m.parent_id));
+          return parentId === userMsgId;
+        });
+        // 新版本索引 = 当前版本数（因为即将生成新版本）
+        const nextVersionIndex = currentChildren.length;
+        setUserMessageVersionIndex(existingUserMsg.id, nextVersionIndex);
+        logger.debug('切换到即将生成的版本', { 
+          messageId: existingUserMsg.id, 
+          versionIndex: nextVersionIndex, 
+          totalVersions: currentChildren.length + 1 
+        });
       }
       
       // 发送到后端（后端会自动处理树形结构和版本分组）
@@ -181,10 +235,43 @@ const App: React.FC = () => {
       const messagesData = await api.session.getMessages(sessionId);
       setMessages(messagesData.messages || []);
       
+      // 如果是重试，自动切换到最新版本
+      if (isRetry && existingUserMsg) {
+        // 找到对应的用户消息（可能ID格式不同）
+        const userMsg = messagesData.messages?.find(m => 
+          m.role === 'user' && 
+          !m.parent_id && 
+          m.content === messageText &&
+          (m.id === existingUserMsg.id || m.message_id?.toString() === existingUserMsg.id)
+        );
+        
+        if (userMsg) {
+          // 计算该用户消息的所有子节点（助手回复）数量
+          const userMsgId = userMsg.message_id || parseInt(userMsg.id);
+          const children = messagesData.messages?.filter(m => {
+            if (m.role !== 'assistant' || !m.parent_id) return false;
+            const parentId = typeof m.parent_id === 'number' ? m.parent_id : parseInt(String(m.parent_id));
+            return parentId === userMsgId;
+          }) || [];
+          
+          // 最新版本索引 = 子节点数量 - 1（因为索引从0开始）
+          const latestVersionIndex = Math.max(0, children.length - 1);
+          
+          // 设置为最新版本
+          setUserMessageVersionIndex(userMsg.id, latestVersionIndex);
+          logger.debug('自动切换到最新版本', { 
+            messageId: userMsg.id, 
+            versionIndex: latestVersionIndex, 
+            totalVersions: children.length 
+          });
+        }
+      }
+      
       const duration = performance.now() - startTime;
       logger.info('消息发送成功', { 
         sessionId, 
         messageCount: messagesData.messages?.length || 0,
+        isRetry,
         duration: `${duration.toFixed(2)}ms`
       });
       
@@ -303,6 +390,7 @@ const App: React.FC = () => {
                       key={`user-${msg.id}`}
                       message={msg}
                       messages={memoizedMessages}
+                      isLoading={isLoading}
                       onEdit={handleMessageEdit}
                       onRegenerate={handleRegenerate}
                       onBranch={handleBranch}
@@ -315,6 +403,7 @@ const App: React.FC = () => {
                       key={`assistant-${msg.id}`}
                       message={msg}
                       messages={memoizedMessages}
+                      isLoading={isLoading}
                       onEdit={handleMessageEdit}
                       onRegenerate={handleRegenerate}
                       onBranch={handleBranch}
@@ -336,6 +425,17 @@ const App: React.FC = () => {
         </main>
       </div>
     </div>
+  );
+};
+
+// 主 App 组件 - 路由配置
+const App: React.FC = () => {
+  return (
+    <Routes>
+      <Route path="/" element={<ChatPage />} />
+      <Route path="/chat/:sessionId" element={<ChatPage />} />
+      <Route path="/router-monitor" element={<RouterMonitor />} />
+    </Routes>
   );
 };
 

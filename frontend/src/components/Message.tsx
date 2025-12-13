@@ -11,6 +11,7 @@ import { getAgentIcon, copyToClipboard, formatTime } from '../utils/helpers';
 interface MessageProps {
   message: MessageType;
   messages?: MessageType[]; // 所有消息，用于查找关联的助手消息
+  isLoading?: boolean; // 是否正在加载（用于显示生成中的状态）
   onEdit?: (messageId: string, newContent: string) => void;
   onRegenerate?: (messageId: string) => void;
   onBranch?: (content: string) => void;
@@ -19,6 +20,7 @@ interface MessageProps {
 export const Message: React.FC<MessageProps> = ({ 
   message, 
   messages = [],
+  isLoading = false,
   onEdit,
   onRegenerate,
   onBranch 
@@ -56,8 +58,6 @@ export const Message: React.FC<MessageProps> = ({
     return null;
   }, [isUser, message.parent_id, messages.length]);
   
-  const parentVersionIndex = parentMsg ? getUserMessageVersionIndex(parentMsg.id) : 0;
-  
   // 使用useMemo缓存版本计算，避免每次渲染都重新计算
   // 使用messages.length作为依赖，而不是整个messages数组
   const versionInfo = useMemo(() => {
@@ -74,17 +74,58 @@ export const Message: React.FC<MessageProps> = ({
         const parentId = typeof m.parent_id === 'number' ? m.parent_id : parseInt(String(m.parent_id));
         return parentId === userMsgId;
       });
-      totalVersions = Math.max(1, children.length); // 至少为1
-      currentVersionIndex = storedVersionIndex;
+      // 如果正在加载，总版本数 = 当前版本数 + 1（即将生成的新版本）
+      const actualChildrenCount = children.length;
+      totalVersions = isLoading ? Math.max(1, actualChildrenCount + 1) : Math.max(1, actualChildrenCount);
+      
+      // 如果正在加载新版本，自动显示最新版本（即将生成的版本）
+      // 这样生成中和生成后的格式会保持一致（都显示 n/n）
+      if (isLoading && totalVersions > actualChildrenCount) {
+        // 正在生成新版本时，显示最新版本号（totalVersions - 1）
+        currentVersionIndex = totalVersions - 1;
+      } else {
+        // 如果存储的索引为0（默认值）且存在多个版本，自动使用最新版本
+        // 这样刚点进来时会显示最新版本（如 6/6）而不是第一个版本（1/6）
+        if (storedVersionIndex === 0 && totalVersions > 1) {
+          currentVersionIndex = totalVersions - 1;
+        } else {
+          // 否则使用存储的版本索引
+          currentVersionIndex = storedVersionIndex;
+        }
+      }
       
       // 确保索引在有效范围内（但不在这里更新状态，避免死循环）
       if (currentVersionIndex >= totalVersions) {
         currentVersionIndex = Math.max(0, totalVersions - 1);
       }
-    } else if (!isUser && message.parent_id) {
-      // 助手消息：检查是否应该显示（根据父节点的当前版本索引）
+    } else if (!isUser && message.parent_id && parentMsg) {
+      // 助手消息：需要计算父消息的实际版本索引（考虑加载状态）
+      const parentStoredIndex = getUserMessageVersionIndex(parentMsg.id);
+      const parentUserMsgId = parentMsg.message_id || parseInt(parentMsg.id);
+      const parentChildren = messages.filter(m => {
+        if (m.role !== 'assistant' || !m.parent_id) return false;
+        const parentId = typeof m.parent_id === 'number' ? m.parent_id : parseInt(String(m.parent_id));
+        return parentId === parentUserMsgId;
+      });
+      const parentActualChildrenCount = parentChildren.length;
+      const parentTotalVersions = isLoading ? Math.max(1, parentActualChildrenCount + 1) : Math.max(1, parentActualChildrenCount);
+      
+      // 计算父消息的实际当前版本索引（与用户消息的逻辑一致）
+      let parentCurrentVersionIndex = parentStoredIndex;
+      if (isLoading && parentTotalVersions > parentActualChildrenCount) {
+        // 正在生成新版本时，显示最新版本号
+        parentCurrentVersionIndex = parentTotalVersions - 1;
+      } else if (parentStoredIndex === 0 && parentTotalVersions > 1) {
+        // 如果存储的索引为0（默认值）且存在多个版本，自动使用最新版本
+        parentCurrentVersionIndex = parentTotalVersions - 1;
+      }
+      if (parentCurrentVersionIndex >= parentTotalVersions) {
+        parentCurrentVersionIndex = Math.max(0, parentTotalVersions - 1);
+      }
+      
+      // 检查是否应该显示（根据父节点的当前版本索引）
       const siblingIdx = message.sibling_index ?? 0;
-      shouldShowAssistant = siblingIdx === parentVersionIndex;
+      shouldShowAssistant = siblingIdx === parentCurrentVersionIndex;
     }
     
     return { totalVersions, currentVersionIndex, shouldShowAssistant };
@@ -96,7 +137,8 @@ export const Message: React.FC<MessageProps> = ({
     message.sibling_index, 
     messages.length, // 只依赖长度，避免数组引用变化导致重新计算
     storedVersionIndex, 
-    parentVersionIndex
+    parentMsg, // 父消息对象，用于助手消息的显示逻辑
+    isLoading // 添加isLoading依赖，确保在加载状态变化时重新计算版本数
   ]);
   
   const { totalVersions, currentVersionIndex, shouldShowAssistant } = versionInfo;
@@ -123,20 +165,26 @@ export const Message: React.FC<MessageProps> = ({
     const actualTotalVersions = Math.max(1, children.length);
     const storedIndex = storedVersionIndex;
     
-    // 只在索引超出范围时修正（避免不必要的状态更新）
-    if (actualTotalVersions > 0 && storedIndex >= actualTotalVersions) {
-      const correctedIndex = Math.max(0, actualTotalVersions - 1);
-      // 只在索引确实需要修正时才更新
-      if (correctedIndex !== storedIndex) {
-        logger.debug('修正消息版本索引', { 
-          messageId: message.id, 
-          storedIndex, 
-          correctedIndex, 
-          totalVersions: actualTotalVersions 
-        });
-        setUserMessageVersionIndex(message.id, correctedIndex);
-        indexCorrectedRef.current = messageKey; // 标记已修正，使用messageKey避免重复
-      }
+    // 如果存储的索引为0（默认值）且存在多个版本，自动设置为最新版本
+    // 这样刚点进来时会显示最新版本（如 6/6）而不是第一个版本（1/6）
+    let correctedIndex = storedIndex;
+    if (actualTotalVersions > 1 && storedIndex === 0) {
+      correctedIndex = actualTotalVersions - 1;
+    } else if (actualTotalVersions > 0 && storedIndex >= actualTotalVersions) {
+      // 索引超出范围时，修正为最新版本
+      correctedIndex = Math.max(0, actualTotalVersions - 1);
+    }
+    
+    // 只在索引确实需要修正时才更新
+    if (correctedIndex !== storedIndex) {
+      logger.debug('修正消息版本索引', { 
+        messageId: message.id, 
+        storedIndex, 
+        correctedIndex, 
+        totalVersions: actualTotalVersions 
+      });
+      setUserMessageVersionIndex(message.id, correctedIndex);
+      indexCorrectedRef.current = messageKey; // 标记已修正，使用messageKey避免重复
     } else {
       // 即使不需要修正，也标记为已处理
       indexCorrectedRef.current = messageKey;
@@ -254,11 +302,10 @@ export const Message: React.FC<MessageProps> = ({
         {/* User Message Actions */}
         {isUser && !message.parent_id && !isEditing && (
           <div className="user-message-actions">
-            {totalVersions > 1 && (
               <div className="version-navigator-compact">
                 <button 
                   className="nav-btn prev" 
-                  disabled={currentVersionIndex === 0}
+                  disabled={currentVersionIndex === 0 || isLoading}
                   onClick={handleVersionPrev}
                   title="上一个版本"
                 >
@@ -266,24 +313,21 @@ export const Message: React.FC<MessageProps> = ({
                 </button>
                 <span className="version-info">
                   {currentVersionIndex + 1}/{totalVersions}
+                  {isLoading && currentVersionIndex === totalVersions - 1 && (
+                    <span className="generating-indicator" title="正在生成...">
+                      <span className="generating-dot">●</span>
+                    </span>
+                  )}
                 </span>
                 <button 
                   className="nav-btn next" 
-                  disabled={currentVersionIndex >= totalVersions - 1}
+                  disabled={currentVersionIndex >= totalVersions - 1 || isLoading}
                   onClick={handleVersionNext}
                   title="下一个版本"
                 >
                   ›
                 </button>
               </div>
-            )}
-            {totalVersions === 1 && (
-              <div className="version-navigator-compact">
-                <button className="nav-btn prev" disabled>‹</button>
-                <span className="version-info">1/1</span>
-                <button className="nav-btn next" disabled>›</button>
-              </div>
-            )}
             <button className="user-action-btn edit-btn" title="编辑" onClick={handleEdit}>
               <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
                 <path d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7"/>
